@@ -1,1 +1,0 @@
-# shan-koe-mee-crypto
