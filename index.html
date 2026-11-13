@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Shan Koe Mee - Real Crypto</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <style>
+    body { background: radial-gradient(circle at center, #0f172a 0%, #020617 100%); user-select: none; -webkit-tap-highlight-color: transparent; }
+    .felt-table { background: radial-gradient(ellipse at center, #065f46 0%, #064e3b 55%, #022c22 100%); border: 6px solid #0284c7; box-shadow: inset 0 0 40px rgba(0,0,0,0.7); }
+    .playing-card { width: 60px; height: 86px; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); display: flex; flex-direction: column; justify-content: space-between; padding: 5px; font-weight: 900; }
+    .playing-card.back { background: repeating-linear-gradient(45deg, #0369a1, #0369a1 6px, #0284c7 6px, #0284c7 12px); border: 3px solid #fff; }
+    .playing-card.back * { display: none; }
+    .card-red { color: #dc2626; } .card-black { color: #0f172a; }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between p-3 overflow-hidden">
+
+  <!-- Top Bar -->
+  <div class="flex flex-col gap-2 bg-slate-900/90 backdrop-blur-md border border-sky-500/30 rounded-2xl p-3 shadow-lg">
+    <div class="flex items-center justify-between">
+      <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+        <button id="tab-TON" onclick="switchCurrency('TON')" class="px-3 py-1 rounded-lg text-xs font-black bg-sky-500 text-slate-950">💎 TON</button>
+        <button id="tab-USDT" onclick="switchCurrency('USDT')" class="px-3 py-1 rounded-lg text-xs font-black text-slate-400">💵 USDT</button>
+      </div>
+      <div id="ton-connect-btn"></div>
+    </div>
+    <div class="flex items-center justify-between border-t border-slate-800 pt-2">
+      <div>
+        <div class="text-[10px] text-slate-400">လက်ကျန်ငွေ (<span id="active-currency-label">TON</span>)</div>
+        <div class="text-base font-black text-sky-400"><span id="balance-display">0.00</span> <span id="balance-unit">TON</span></div>
+      </div>
+      <div class="flex gap-1.5">
+        <button onclick="openWalletModal('deposit')" class="bg-emerald-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow">Deposit (Min 1.0)</button>
+        <button onclick="openWalletModal('withdraw')" class="bg-sky-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow">Withdraw (Min 3.0)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Table -->
+  <div class="felt-table relative w-full max-w-md mx-auto flex-1 my-2.5 rounded-[38px] flex flex-col justify-between items-center py-4 px-4">
+    <div class="flex flex-col items-center gap-1.5 w-full">
+      <div class="bg-slate-950/75 border border-sky-400/40 px-3 py-1 rounded-full flex items-center gap-2">
+        <span class="text-xs font-bold text-amber-300">ဒိုင် (Banker)</span>
+        <span id="banker-score" class="text-xs font-black text-white bg-slate-800 px-2 py-0.5 rounded-md hidden"></span>
+      </div>
+      <div id="banker-cards" class="flex justify-center gap-2 min-h-[88px] items-center"></div>
+    </div>
+
+    <div class="flex flex-col items-center justify-center my-1 text-center">
+      <div id="status-banner" class="bg-slate-950/85 border border-sky-500/40 px-4 py-1.5 rounded-2xl text-xs font-bold text-sky-300 shadow-lg mb-1.5">
+        လောင်းကြေးရွေးပြီး ဖဲဝေပါ (Min Bet: 0.1)
+      </div>
+      <div class="bg-black/50 border border-white/10 px-4 py-1 rounded-full text-xs font-bold text-emerald-300">
+        Bet: <span id="current-bet-display" class="text-white font-black">0.1</span> <span id="bet-unit">TON</span>
+      </div>
+    </div>
+
+    <div class="flex flex-col items-center gap-1.5 w-full">
+      <div id="player-cards" class="flex justify-center gap-2 min-h-[88px] items-center"></div>
+      <div class="bg-slate-950/75 border border-emerald-400/40 px-3 py-1 rounded-full flex items-center gap-2">
+        <span id="player-name" class="text-xs font-bold text-emerald-300">Player</span>
+        <span id="player-score" class="text-xs font-black text-white bg-slate-800 px-2 py-0.5 rounded-md hidden"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="w-full max-w-md mx-auto bg-slate-900/95 border border-slate-800 rounded-3xl p-3 flex flex-col gap-2.5 shadow-2xl">
+    <div class="grid grid-cols-4 gap-2">
+      <button onclick="setBet(0.1)" class="bg-slate-800 border border-sky-500/40 py-2 rounded-xl text-xs font-black text-sky-400">0.1</button>
+      <button onclick="setBet(0.5)" class="bg-slate-800 border border-emerald-500/40 py-2 rounded-xl text-xs font-black text-emerald-400">0.5</button>
+      <button onclick="setBet(1.0)" class="bg-slate-800 border border-amber-500/40 py-2 rounded-xl text-xs font-black text-amber-400">1.0</button>
+      <button onclick="setBet(5.0)" class="bg-slate-800 border border-rose-500/40 py-2 rounded-xl text-xs font-black text-rose-400">5.0+</button>
+    </div>
+
+    <div id="deal-btn-box" class="flex gap-2">
+      <button id="deal-btn" onclick="startGame()" class="flex-1 py-3.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-black text-sm rounded-2xl shadow-lg">ဖဲဝေမည် (Deal)</button>
+      <button onclick="becomeBanker()" class="py-3.5 px-4 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-2xl shadow-lg">ဒိုင်ကိုင်မည် (Min 1.0)</button>
+    </div>
+
+    <div id="play-btn-box" class="grid grid-cols-2 gap-2.5 hidden">
+      <button onclick="sendAction('draw')" class="py-3.5 bg-amber-500 text-white font-black text-sm rounded-2xl shadow-lg">ဖဲဆွဲမည်</button>
+      <button onclick="sendAction('show')" class="py-3.5 bg-emerald-500 text-white font-black text-sm rounded-2xl shadow-lg">ဖဲလှန်မည်</button>
+    </div>
+  </div>
+
+  <!-- Wallet Modal -->
+  <div id="wallet-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-sm p-5 flex flex-col gap-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 id="modal-title" class="text-base font-black text-sky-400">Crypto Wallet</h3>
+        <button onclick="closeWalletModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div id="deposit-section" class="flex flex-col gap-3">
+        <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-xs space-y-1">
+          <div class="text-slate-400">Admin TON / USDT Wallet:</div>
+          <div class="text-[11px] font-mono font-bold text-emerald-400 select-all">UQB_YOUR_ADMIN_WALLET_ADDRESS</div>
+          <div class="text-[11px] text-amber-400">* အနည်းဆုံး ငွေသွင်းရန် 1.0</div>
+        </div>
+        <input type="number" step="0.1" id="dep-amount" placeholder="ပမာဏ (အနည်းဆုံး 1.0)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
+        <input type="text" id="dep-txhash" placeholder="Transaction Hash သို့မဟုတ် Memo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
+        <button onclick="submitDeposit()" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl text-xs">ငွေသွင်းမှု အတည်ပြုမည်</button>
+      </div>
+
+      <div id="withdraw-section" class="hidden flex-col gap-3">
+        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] text-amber-400">
+          * အနည်းဆုံး 3.0 ထုတ်ယူနိုင်ပြီး ငွေထုတ်ခ Fee 0.05 ဖြတ်တောက်ပါမည်။
+        </div>
+        <input type="text" id="wd-wallet" placeholder="သင့် Wallet Address" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
+        <input type="number" step="0.1" id="wd-amount" placeholder="ထုတ်ယူမည့် ပမာဏ (Min 3.0)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white">
+        <button onclick="submitWithdraw()" class="w-full py-3 bg-sky-600 text-white font-bold rounded-xl text-xs">ငွေထုတ်ရန် တောင်းဆိုမည်</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : { ready: () => {}, expand: () => {}, showAlert: (m) => alert(m), initDataUnsafe: {} };
+    try { tg.ready(); tg.expand(); } catch(e){}
+
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: window.location.origin + '/tonconnect-manifest.json',
+      buttonRootId: 'ton-connect-btn'
+    });
+
+    let userId = "test_user_01";
+    let userName = "Player";
+    let activeCurrency = "TON";
+    let balances = { TON: 0, USDT: 0 };
+    let currentBet = 0.1;
+    let gameActive = false;
+
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+      userId = tg.initDataUnsafe.user.id;
+      userName = tg.initDataUnsafe.user.first_name;
+      document.getElementById('player-name').innerText = userName;
+    }
+
+    async function apiCall(payload) {
+      const res = await fetch('/api/index', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, userName, ...payload }) });
+      return res.json();
+    }
+
+    async function syncBalances() {
+      const data = await apiCall({ action: 'init' });
+      if (data.success) { balances = data.balances; updateUI(); }
+    }
+
+    function switchCurrency(curr) {
+      if (gameActive) return;
+      activeCurrency = curr;
+      document.getElementById('tab-TON').className = curr === 'TON' ? "px-3 py-1 rounded-lg text-xs font-black bg-sky-500 text-slate-950" : "px-3 py-1 rounded-lg text-xs font-black text-slate-400";
+      document.getElementById('tab-USDT').className = curr === 'USDT' ? "px-3 py-1 rounded-lg text-xs font-black bg-emerald-500 text-slate-950" : "px-3 py-1 rounded-lg text-xs font-black text-slate-400";
+      updateUI();
+    }
+
+    function updateUI() {
+      document.getElementById('active-currency-label').innerText = activeCurrency;
+      document.getElementById('balance-display').innerText = balances[activeCurrency].toFixed(2);
+      document.getElementById('balance-unit').innerText = activeCurrency;
+      document.getElementById('current-bet-display').innerText = currentBet;
+      document.getElementById('bet-unit').innerText = activeCurrency;
+    }
+
+    function setBet(amt) { if (gameActive) return; currentBet = amt; updateUI(); }
+
+    function renderCards(containerId, hand, hideCount = 0) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if (hideCount > 0) {
+        for (let i = 0; i < hideCount; i++) {
+          const div = document.createElement('div'); div.className = 'playing-card back'; container.appendChild(div);
+        }
+        return;
+      }
+      hand.forEach(card => {
+        const div = document.createElement('div');
+        div.className = `playing-card ${card.color}`;
+        div.innerHTML = `<div class="text-xs leading-none">${card.label}<br>${card.suit}</div><div class="text-xl self-center">${card.suit}</div><div class="text-xs leading-none self-end rotate-180">${card.label}<br>${card.suit}</div>`;
+        container.appendChild(div);
+      });
+    }
+
+    async function becomeBanker() {
+      const data = await apiCall({ action: 'become_banker', currency: activeCurrency });
+      if (data.success) {
+        tg.showAlert(`ဒိုင်အဖြစ် ခန့်အပ်ပြီးပါပြီ။ (Max Rounds: ${data.bankerData.maxRounds})`);
+      } else {
+        tg.showAlert(data.error);
+      }
+    }
+
+    async function startGame() {
+      if (balances[activeCurrency] < currentBet) {
+        tg.showAlert("လက်ကျန်ငွေ မလုံလောက်ပါ။ ငွေအရင်သွင်းပါ။");
+        openWalletModal('deposit');
+        return;
+      }
+      const data = await apiCall({ action: 'deal', currency: activeCurrency, bet: currentBet });
+      if (!data.success) { tg.showAlert(data.error); return; }
+
+      if (data.finished) { handleRoundFinished(data); }
+      else {
+        gameActive = true;
+        renderCards('player-cards', data.playerHand, 0);
+        renderCards('banker-cards', [], data.bankerCardCount);
+        document.getElementById('banker-score').classList.add('hidden');
+        document.getElementById('player-score').innerText = data.playerEval.label;
+        document.getElementById('player-score').classList.remove('hidden');
+        document.getElementById('status-banner').innerText = "ဖဲဆွဲရန် သို့မဟုတ် လှန်ရန် ရွေးပါ";
+        document.getElementById('deal-btn-box').classList.add('hidden');
+        document.getElementById('play-btn-box').classList.remove('hidden');
+      }
+    }
+
+    async function sendAction(act) {
+      if (!gameActive) return;
+      const data = await apiCall({ action: act });
+      if (data.success && data.finished) { handleRoundFinished(data); }
+    }
+
+    function handleRoundFinished(data) {
+      gameActive = false;
+      balances[data.currency] = data.newBalance;
+      updateUI();
+      renderCards('player-cards', data.playerHand, 0);
+      renderCards('banker-cards', data.bankerHand, 0);
+      document.getElementById('player-score').innerText = data.playerEval.label;
+      document.getElementById('player-score').classList.remove('hidden');
+      document.getElementById('banker-score').innerText = data.bankerEval.label;
+      document.getElementById('banker-score').classList.remove('hidden');
+
+      const banner = document.getElementById('status-banner');
+      if (data.outcome === 'WIN') banner.innerHTML = `<span class="text-emerald-400">🎉 WIN! +${data.diff} ${data.currency}</span>`;
+      else if (data.outcome === 'LOSE') banner.innerHTML = `<span class="text-rose-400">❌ LOSE! -${data.diff} ${data.currency}</span>`;
+      else banner.innerHTML = `<span class="text-sky-400">🤝 DRAW (သရေ)</span>`;
+
+      if (data.bankerEnded) {
+        setTimeout(() => tg.showAlert("ဒိုင် ၃ ကြိမ် ကန့်သတ်ချက်ပြည့်သွားပါပြီ။"), 500);
+      }
+
+      document.getElementById('play-btn-box').classList.add('hidden');
+      document.getElementById('deal-btn-box').classList.remove('hidden');
+    }
+
+    function openWalletModal(tab) {
+      document.getElementById('wallet-modal').classList.remove('hidden');
+      if (tab === 'deposit') {
+        document.getElementById('deposit-section').classList.remove('hidden');
+        document.getElementById('withdraw-section').classList.add('hidden');
+      } else {
+        document.getElementById('deposit-section').classList.add('hidden');
+        document.getElementById('withdraw-section').classList.remove('hidden');
+      }
+    }
+    function closeWalletModal() { document.getElementById('wallet-modal').classList.add('hidden'); }
+
+    async function submitDeposit() {
+      const amount = document.getElementById('dep-amount').value;
+      const txHash = document.getElementById('dep-txhash').value;
+      const data = await apiCall({ action: 'deposit', currency: activeCurrency, amount, txHash });
+      if (data.success) { tg.showAlert(data.message); closeWalletModal(); } else { tg.showAlert(data.error); }
+    }
+
+    async function submitWithdraw() {
+      const wallet = document.getElementById('wd-wallet').value;
+      const amount = document.getElementById('wd-amount').value;
+      const data = await apiCall({ action: 'withdraw', currency: activeCurrency, wallet, amount });
+      if (data.success) { balances[data.currency] = data.newBalance; updateUI(); tg.showAlert(data.message); closeWalletModal(); } else { tg.showAlert(data.error); }
+    }
+
+    syncBalances();
+  </script>
+</body>
+</html>
